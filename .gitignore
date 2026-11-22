@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+datasets/
+runs/
+logs/
+results/
+*.pth
+*.hdf5
+videos/
+configs/
