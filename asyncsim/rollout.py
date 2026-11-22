@@ -10,7 +10,6 @@ from collections import deque
 
 import numpy as np
 
-from asyncsim.async_env import AsyncEnv
 
 
 class FrameStacker:
@@ -74,22 +73,29 @@ def sync_rollout(policy, env, horizon, frame_stack=1, extra_latency=0.0,
     )
 
 
-def async_rollout(policy, env, horizon, control_freq=20.0, real_time_rate=1.0,
-                  frame_stack=1, extra_latency=0.0, record=False, init_state=None,
-                  hold="repeat"):
-    """Policy runs in this (main) thread as fast as it can; physics runs in a
-    background thread at a fixed wall-clock rate. `hold` = what the robot does
-    while waiting for the next action ("repeat" last action or "stop")."""
+def async_rollout(policy, aenv, env, frame_stack=1, extra_latency=0.0, hold="repeat",
+                  record=False, init_state=None):
+    """Policy runs in this process as fast as it can; physics runs in the
+    AsyncEnv's separate process at a fixed wall-clock rate.
+
+    Args:
+        aenv: AsyncEnv (physics process), reused across episodes
+        env: local env, only used to sample the initial state so that sync and
+             async episodes start from the same distribution
+        hold: what the robot does while waiting for the next action
+              ("repeat" last action or "stop")
+    """
     policy.start_episode()
     stack = FrameStacker(frame_stack)
-    aenv = AsyncEnv(env, control_freq=control_freq, real_time_rate=real_time_rate,
-                    horizon=horizon, record=record, hold=hold)
+    if init_state is None:
+        env.reset()
+        init_state = env.get_state()["states"]
     aenv.reset(init_state)
 
     latencies, staleness = [], []
     last_obs_step = -1
     t0 = time.perf_counter()
-    aenv.start()
+    aenv.start(hold=hold, record=record)
     try:
         while not aenv.done():
             obs, obs_step = aenv.latest_obs()
@@ -104,18 +110,18 @@ def async_rollout(policy, env, horizon, control_freq=20.0, real_time_rate=1.0,
             staleness.append(aenv.step_count - obs_step)
             aenv.push_action(action)
     finally:
-        aenv.stop()
+        res = aenv.finish()
 
     return dict(
-        states=aenv.states if record else None,
+        states=res["states"],
         mode=f"async_{hold}",
-        idle_ticks=aenv.idle_ticks,
-        success=float(aenv.success),
-        steps=aenv.step_count,
+        idle_ticks=res["idle_ticks"],
+        success=float(res["success"]),
+        steps=res["steps"],
         wall_time=time.perf_counter() - t0,
         mean_latency=float(np.mean(latencies)) if latencies else 0.0,
         max_latency=float(np.max(latencies)) if latencies else 0.0,
         policy_calls=len(latencies),
         mean_staleness_ticks=float(np.mean(staleness)) if staleness else 0.0,
-        physics_overruns=aenv.overruns,
+        physics_overruns=res["overruns"],
     )

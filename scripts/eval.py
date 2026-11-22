@@ -5,32 +5,31 @@ Examples:
     # smoke test without a trained policy (random actions)
     python scripts/eval.py --dummy --dataset datasets/lift/ph/low_dim_v15.hdf5 --mode async -n 2
 
-    # trained policy, async, +50 ms artificial latency
-    python scripts/eval.py --ckpt runs/bc/.../last.pth --mode async --extra_latency 0.05 -n 50
+    # trained policy, async (physics in a separate process), +50 ms artificial latency
+    python scripts/eval.py --ckpt runs/bc/.../last.pth --mode async --hold stop --extra_latency 0.05 -n 50
 """
 import argparse
 import csv
+import functools
 import json
 import os
 import sys
-import time
 
 import numpy as np
 import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import robomimic.utils.env_utils as EnvUtils
 import robomimic.utils.file_utils as FileUtils
-import robomimic.utils.obs_utils as ObsUtils
 import robomimic.utils.torch_utils as TorchUtils
 
+from asyncsim import envs
+from asyncsim.async_env import AsyncEnv
 from asyncsim.rollout import async_rollout, sync_rollout
 
 FIELDS = ["algo", "mode", "extra_latency", "seed", "rollout", "success", "steps", "wall_time",
           "mean_latency", "max_latency", "policy_calls", "mean_staleness_ticks", "idle_ticks",
           "physics_overruns", "control_freq", "real_time_rate", "device", "tag", "ckpt"]
-LOW_DIM_KEYS =["robot0_eef_pos", "robot0_eef_quat", "robot0_gripper_qpos", "object"]
 
 
 class RandomPolicy:
@@ -44,26 +43,34 @@ class RandomPolicy:
         return np.random.uniform(-1, 1, self.ac_dim)
 
 
-def load(args):
-    if args.dummy:
-        ObsUtils.initialize_obs_utils_with_obs_specs({"obs": {"low_dim": LOW_DIM_KEYS}})
-        env_meta = FileUtils.get_env_metadata_from_dataset(args.dataset)
-        env = EnvUtils.create_env_from_metadata(
-            env_meta=env_meta, render=False, render_offscreen=False, use_image_obs=False)
-        return RandomPolicy(env.action_dimension), env, 1, "random"
-
-    device = TorchUtils.get_torch_device(try_to_use_cuda=(args.device == "cuda"))
-    policy, ckpt = FileUtils.policy_from_checkpoint(ckpt_path=args.ckpt, device=device, verbose=False)
-    env, _ = FileUtils.env_from_checkpoint(ckpt_dict=ckpt, render=False, render_offscreen=False, verbose=False)
-    config, _ = FileUtils.config_from_checkpoint(ckpt_dict=ckpt)
-    return policy, env, policy_frame_stack(env, config), config.algo_name
-
-
 def policy_frame_stack(env, config):
     """robomimic's env_from_checkpoint already wraps the env in a FrameStackWrapper
     when frame_stack > 1; only stack ourselves if it did not."""
     from robomimic.envs.wrappers import FrameStackWrapper
     return 1 if isinstance(env, FrameStackWrapper) else config.train.frame_stack
+
+
+def load(ckpt=None, dataset=None, device="cuda", render_offscreen=False):
+    """Returns (policy, local env, env_fn for the physics process, frame_stack, algo name)."""
+    if ckpt is None:
+        env_fn = functools.partial(envs.env_from_dataset, dataset)
+        env = envs.env_from_dataset(dataset, render_offscreen=render_offscreen)
+        return RandomPolicy(env.action_dimension), env, env_fn, 1, "random"
+
+    dev = TorchUtils.get_torch_device(try_to_use_cuda=(device == "cuda"))
+    policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=ckpt, device=dev, verbose=False)
+    env, _ = FileUtils.env_from_checkpoint(ckpt_dict=ckpt_dict, render=False,
+                                           render_offscreen=render_offscreen, verbose=False)
+    config, _ = FileUtils.config_from_checkpoint(ckpt_dict=ckpt_dict)
+    env_fn = functools.partial(envs.env_from_ckpt, ckpt)
+    return policy, env, env_fn, policy_frame_stack(env, config), config.algo_name
+
+
+def make_async_env(env, env_fn, control_freq, real_time_rate, horizon):
+    """Start the physics process for `env` (shared-memory layout from a sample obs)."""
+    spec = envs.obs_spec(env.reset())
+    return AsyncEnv(env_fn, spec, env.action_dimension, control_freq=control_freq,
+                    real_time_rate=real_time_rate, horizon=horizon)
 
 
 def main():
@@ -88,22 +95,30 @@ def main():
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    policy, env, frame_stack, algo = load(args)
+    policy, env, env_fn, frame_stack, algo = load(
+        None if args.dummy else args.ckpt, args.dataset, args.device)
+
+    aenv = None
+    if args.mode == "async":
+        aenv = make_async_env(env, env_fn, args.control_freq, args.real_time_rate, args.horizon)
+        np.random.seed(args.seed)  # same initial states as a sync run with this seed
 
     rows = []
-    for i in range(args.n_rollouts):
-        if args.mode == "sync":
-            r = sync_rollout(policy, env, args.horizon, frame_stack, args.extra_latency)
-        else:
-            r = async_rollout(policy, env, args.horizon, args.control_freq,
-                              args.real_time_rate, frame_stack, args.extra_latency,
-                              hold=args.hold)
-        r.pop("states", None)
-        r.update(algo=algo, rollout=i, seed=args.seed, extra_latency=args.extra_latency,
-                 control_freq=args.control_freq, real_time_rate=args.real_time_rate,
-                 device=args.device, tag=args.tag, ckpt=args.ckpt or "")
-        rows.append(r)
-        print(json.dumps({k: (round(v, 4) if isinstance(v, float) else v) for k, v in r.items()}), flush=True)
+    try:
+        for i in range(args.n_rollouts):
+            if args.mode == "sync":
+                r = sync_rollout(policy, env, args.horizon, frame_stack, args.extra_latency)
+            else:
+                r = async_rollout(policy, aenv, env, frame_stack, args.extra_latency, hold=args.hold)
+            r.pop("states", None)
+            r.update(algo=algo, rollout=i, seed=args.seed, extra_latency=args.extra_latency,
+                     control_freq=args.control_freq, real_time_rate=args.real_time_rate,
+                     device=args.device, tag=args.tag, ckpt=args.ckpt or "")
+            rows.append(r)
+            print(json.dumps({k: (round(v, 4) if isinstance(v, float) else v) for k, v in r.items()}), flush=True)
+    finally:
+        if aenv is not None:
+            aenv.close()
 
     print(f"== {algo} {rows[0]['mode']} latency+{args.extra_latency}s: "
           f"success {np.mean([r['success'] for r in rows]):.2%} over {len(rows)} rollouts")
