@@ -39,7 +39,7 @@ def wilson(k, n, z=1.96):
 
 def load(sweep_dir):
     cells = defaultdict(list)  # (algo, mode, latency) -> rows
-    for f in glob.glob(os.path.join(sweep_dir, "*.csv")):
+    for f in glob.glob(os.path.join(sweep_dir, "task_*.csv")):
         for r in csv.DictReader(open(f)):
             cells[(r["algo"], r["mode"], float(r["extra_latency"]))].append(r)
     return cells
