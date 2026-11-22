@@ -27,7 +27,10 @@ import robomimic.utils.torch_utils as TorchUtils
 
 from asyncsim.rollout import async_rollout, sync_rollout
 
-LOW_DIM_KEYS = ["robot0_eef_pos", "robot0_eef_quat", "robot0_gripper_qpos", "object"]
+FIELDS = ["algo", "mode", "extra_latency", "seed", "rollout", "success", "steps", "wall_time",
+          "mean_latency", "max_latency", "policy_calls", "mean_staleness_ticks", "idle_ticks",
+          "physics_overruns", "control_freq", "real_time_rate", "device", "tag", "ckpt"]
+LOW_DIM_KEYS =["robot0_eef_pos", "robot0_eef_quat", "robot0_gripper_qpos", "object"]
 
 
 class RandomPolicy:
@@ -106,10 +109,10 @@ def main():
           f"success {np.mean([r['success'] for r in rows]):.2%} over {len(rows)} rollouts")
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    fields = sorted({k for r in rows for k in r})
+    # fixed column set so sync and async rows can share one CSV
     new = not os.path.exists(args.out)
     with open(args.out, "a", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
+        w = csv.DictWriter(f, fieldnames=FIELDS, restval="")
         if new:
             w.writeheader()
         w.writerows(rows)

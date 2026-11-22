@@ -6,5 +6,3 @@ logs/
 results/
 *.pth
 *.hdf5
-videos/
-configs/
