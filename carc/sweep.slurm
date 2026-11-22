@@ -1,12 +1,13 @@
 #!/bin/bash
 # Evaluate every grid cell of scripts/sweep_grid.py in parallel as a Slurm job array.
-#   BC_CKPT=... DP_CKPT=... sbatch -A <account> --array=0-$(( $(python scripts/sweep_grid.py --count) - 1 )) carc/sweep.slurm
+#   N=$(python scripts/sweep_grid.py --count)
+#   BC_CKPT=... DP_CKPT=... sbatch -A <account> --array=0-$((N-1))%10 carc/sweep.slurm
 #SBATCH --job-name=asyncsim-sweep
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=02:00:00
+#SBATCH --time=04:00:00
 #SBATCH --output=logs/sweep_%A_%a.out
 
 set -e

@@ -13,13 +13,17 @@ CKPTS = {  # name -> checkpoint path (set via env vars so the grid stays generic
     "bc": os.environ.get("BC_CKPT", ""),
     "diffusion_policy": os.environ.get("DP_CKPT", ""),
 }
-MODES = ["sync", "async"]
-LATENCIES = [0.0, 0.025, 0.05, 0.1, 0.2, 0.4]  # extra seconds per policy call
-SEEDS = [0, 1]
+MODES = {  # name -> eval.py args
+    "sync": "--mode sync",
+    "async_repeat": "--mode async --hold repeat",
+    "async_stop": "--mode async --hold stop",
+}
+LATENCIES = [0.0, 0.1, 0.2, 0.4, 0.8]  # extra seconds per policy call
+SEED = 0
 
 
 def grid():
-    return list(itertools.product(CKPTS.keys(), MODES, LATENCIES, SEEDS))
+    return list(itertools.product(CKPTS.keys(), MODES.keys(), LATENCIES))
 
 
 if __name__ == "__main__":
@@ -31,5 +35,5 @@ if __name__ == "__main__":
     if a.count:
         print(len(g))
     else:
-        algo, mode, lat, seed = g[a.index]
-        print(f"--ckpt {CKPTS[algo]} --mode {mode} --extra_latency {lat} --seed {seed} --tag {algo}")
+        algo, mode, lat = g[a.index]
+        print(f"--ckpt {CKPTS[algo]} {MODES[mode]} --extra_latency {lat} --seed {SEED} --tag {algo}")
