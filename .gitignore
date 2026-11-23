@@ -6,6 +6,7 @@ logs/
 results/
 *.pth
 *.hdf5
-videos_new/
-videos/
+/videos_new/
+/videos/
 configs/
+/videos_v2/
