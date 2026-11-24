@@ -2,6 +2,7 @@
 # Evaluate every grid cell of scripts/sweep_grid.py in parallel as a Slurm job array.
 #   N=$(python scripts/sweep_grid.py --count)
 #   BC_CKPT=... DP_CKPT=... sbatch -A <account> --array=0-$((N-1))%10 carc/sweep.slurm
+# Optional env: HORIZON (ticks per episode, default 400), N_ROLLOUTS (default 50).
 #SBATCH --job-name=asyncsim-sweep
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1

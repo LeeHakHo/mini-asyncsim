@@ -20,6 +20,7 @@ MODES = {  # name -> eval.py args
 }
 LATENCIES = [0.0, 0.1, 0.2, 0.4, 0.8]  # extra seconds per policy call
 SEED = 0
+HORIZON = int(os.environ.get("HORIZON", 400))  # control ticks per episode
 
 
 def grid():
@@ -36,4 +37,4 @@ if __name__ == "__main__":
         print(len(g))
     else:
         algo, mode, lat = g[a.index]
-        print(f"--ckpt {CKPTS[algo]} {MODES[mode]} --extra_latency {lat} --seed {SEED} --tag {algo}")
+        print(f"--ckpt {CKPTS[algo]} {MODES[mode]} --extra_latency {lat} --seed {SEED} --horizon {HORIZON} --tag {algo}")

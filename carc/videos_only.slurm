@@ -1,6 +1,6 @@
 #!/bin/bash
 # Re-render the comparison videos only (no evaluation rollouts).
-#   BC_CKPT=... DP_CKPT=... sbatch -A <account> carc/videos_only.slurm
+#   BC_CKPT=... DP_CKPT=... [OUT=... HORIZON=...] sbatch -A <account> carc/videos_only.slurm
 #SBATCH --job-name=asyncsim-videos
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
@@ -15,7 +15,8 @@ conda activate asyncsim
 cd "$SLURM_SUBMIT_DIR"
 export MUJOCO_GL=egl
 OUT=${OUT:-videos_new}
-python scripts/make_video.py --ckpt "$BC_CKPT" --extra_latency 0.2 --out "$OUT/bc_lat200"
-python scripts/make_video.py --ckpt "$DP_CKPT" --extra_latency 0.0 --out "$OUT/dp_lat0"
-python scripts/make_video.py --ckpt "$DP_CKPT" --extra_latency 0.2 --out "$OUT/dp_lat200"
+H="--horizon ${HORIZON:-400}"
+python scripts/make_video.py --ckpt "$BC_CKPT" $H --extra_latency 0.2 --out "$OUT/bc_lat200"
+python scripts/make_video.py --ckpt "$DP_CKPT" $H --extra_latency 0.0 --out "$OUT/dp_lat0"
+python scripts/make_video.py --ckpt "$DP_CKPT" $H --extra_latency 0.2 --out "$OUT/dp_lat200"
 echo VIDEOS_DONE

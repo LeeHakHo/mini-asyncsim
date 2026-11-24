@@ -2,13 +2,14 @@
 Plot a sweep: success rate and time-to-success vs. extra policy latency,
 one column per policy, one line per mode (sync / async_repeat / async_stop).
 
-    python scripts/plot.py results/sweep_<jobid>            -> results/sweep_<jobid>/sweep.png + summary.csv
+    python scripts/plot.py results/sweep_<jobid>                             -> sweep.png + summary.csv
+    python scripts/plot.py results/sweep_<jobid> --task Square --horizon 800
 """
+import argparse
 import csv
 import glob
 import math
 import os
-import sys
 from collections import defaultdict
 
 import matplotlib
@@ -17,7 +18,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 CONTROL_FREQ = 20.0
-HORIZON_S = 400 / CONTROL_FREQ  # async episodes end after 400 ticks
 MODES = [  # fixed order -> fixed colour (validated categorical slots 1-3) + marker
     ("sync", "sync (world waits)", "#2a78d6", "o"),
     ("async_repeat", "async: repeat last action", "#eb6834", "s"),
@@ -59,7 +59,8 @@ def summarize(cells):
     return out
 
 
-def main(sweep_dir):
+def main(sweep_dir, task="Lift", horizon=400):
+    horizon_s = horizon / CONTROL_FREQ  # episodes end after `horizon` control ticks
     summary = summarize(load(sweep_dir))
     with open(os.path.join(sweep_dir, "summary.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(summary[0]))
@@ -85,9 +86,9 @@ def main(sweep_dir):
                               markersize=7, linewidth=2, label=label)
         axes[0, col].set_title(algo_name, color=INK, fontsize=12, loc="left")
         axes[0, col].set_ylim(0, 105)
-        axes[1, col].axhline(HORIZON_S, color=MUTED, linestyle="--", linewidth=1)
-        axes[1, col].text(0, HORIZON_S, " episode time limit", color=MUTED, fontsize=8.5, va="bottom")
-        axes[1, col].set_ylim(0, HORIZON_S + 2)
+        axes[1, col].axhline(horizon_s, color=MUTED, linestyle="--", linewidth=1)
+        axes[1, col].text(0, horizon_s, " episode time limit", color=MUTED, fontsize=8.5, va="bottom")
+        axes[1, col].set_ylim(0, horizon_s + 2)
         axes[1, col].set_xlabel("extra policy latency (ms)")
     axes[0, 0].set_ylabel("success rate (%)")
     axes[1, 0].set_ylabel("median time to success (s, sim time)")
@@ -99,7 +100,7 @@ def main(sweep_dir):
     handles, labels = axes[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=3, frameon=False,
                bbox_to_anchor=(0.5, 1.0))
-    fig.text(0.5, 0.005, "Lift task, 20 Hz control, 50 rollouts per point; "
+    fig.text(0.5, 0.005, f"{task} task, 20 Hz control, 50 rollouts per point; "
              "shaded = 95% Wilson interval. Diffusion Policy also has its own inference time.",
              ha="center", color=MUTED, fontsize=8.5)
     fig.tight_layout(rect=(0, 0.02, 1, 0.95))
@@ -111,4 +112,9 @@ def main(sweep_dir):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    p = argparse.ArgumentParser()
+    p.add_argument("sweep_dir")
+    p.add_argument("--task", default="Lift")
+    p.add_argument("--horizon", type=int, default=400)
+    a = p.parse_args()
+    main(a.sweep_dir, a.task, a.horizon)
