@@ -97,26 +97,3 @@ Same initial state, sync | async-repeat | async-stop:
 * [`docs/videos/bc_lat200_side_by_side.mp4`](docs/videos/bc_lat200_side_by_side.mp4): BC, +200 ms
 * [`docs/videos/dp_lat0_side_by_side.mp4`](docs/videos/dp_lat0_side_by_side.mp4): Diffusion Policy, no extra latency
 * [`docs/videos/dp_lat200_side_by_side.mp4`](docs/videos/dp_lat200_side_by_side.mp4): Diffusion Policy, +200 ms
-
-## Running on CARC
-
-```bash
-# 1. Environment
-bash carc/setup_env.sh
-# 2. Training (task: lift or square)
-sbatch -A <account> carc/train.slurm bc
-sbatch -A <account> carc/train.slurm diffusion_policy
-sbatch -A <account> carc/train.slurm bc square
-sbatch -A <account> carc/train.slurm diffusion_policy square
-# 3. Smoke test with a random policy
-python scripts/eval.py --dummy --dataset datasets/lift/ph/low_dim_v15.hdf5 --mode async -n 2
-# 4. Evaluation sweep (Lift, then Square)
-BC_CKPT=... DP_CKPT=... sbatch -A <account> --array=0-29%10 carc/sweep.slurm
-BC_CKPT=... DP_CKPT=... HORIZON=800 sbatch -A <account> --array=0-29%10 --time=12:00:00 carc/sweep.slurm
-# 5. Plots
-python scripts/plot.py results/sweep_<jobid>
-python scripts/plot.py results/sweep_<jobid> --task Square --horizon 800
-python scripts/compare.py docs/compare.png Lift=docs/summary.csv Square=docs/square/summary.csv
-# 6. Videos
-BC_CKPT=... DP_CKPT=... sbatch -A <account> carc/videos.slurm
-```
