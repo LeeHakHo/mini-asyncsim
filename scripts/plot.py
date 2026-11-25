@@ -1,9 +1,8 @@
 """
-Plot a sweep: success rate and time-to-success vs. extra policy latency,
-one column per policy, one line per mode (sync / async_repeat / async_stop).
+Plot success rate and time to success vs. extra latency for a sweep.
+Writes sweep.png and summary.csv into the sweep directory.
 
-    python scripts/plot.py results/sweep_<jobid>                             -> sweep.png + summary.csv
-    python scripts/plot.py results/sweep_<jobid> --task Square --horizon 800
+    python scripts/plot.py results/sweep_<jobid> [--task Square --horizon 800]
 """
 import argparse
 import csv
@@ -18,7 +17,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 CONTROL_FREQ = 20.0
-MODES = [  # fixed order -> fixed colour (validated categorical slots 1-3) + marker
+MODES = [  # (mode, label, color, marker)
     ("sync", "sync (world waits)", "#2a78d6", "o"),
     ("async_repeat", "async: repeat last action", "#eb6834", "s"),
     ("async_stop", "async: stop until next action", "#1baf7a", "^"),
@@ -60,7 +59,7 @@ def summarize(cells):
 
 
 def main(sweep_dir, task="Lift", horizon=400):
-    horizon_s = horizon / CONTROL_FREQ  # episodes end after `horizon` control ticks
+    horizon_s = horizon / CONTROL_FREQ
     summary = summarize(load(sweep_dir))
     with open(os.path.join(sweep_dir, "summary.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(summary[0]))

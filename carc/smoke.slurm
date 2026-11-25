@@ -1,5 +1,5 @@
 #!/bin/bash
-# Download the Lift dataset and run sync/async rollouts with a random policy.
+# Download the Lift dataset and run sync and async rollouts with a random policy.
 #   sbatch -A <account> carc/smoke.slurm
 #SBATCH --job-name=asyncsim-smoke
 #SBATCH --partition=main

@@ -1,11 +1,7 @@
 """
-Write a robomimic training config (low-dim) from robomimic's own templates.
+Write a low-dim robomimic training config from robomimic's templates.
 
-    python scripts/make_config.py bc                       -> configs/lift_bc.json
-    python scripts/make_config.py diffusion_policy square  -> configs/square_diffusion_policy.json
-    python scripts/make_config.py diffusion_policy square 3000  -> configs/square_diffusion_policy_e3000.json
-
-Tasks: lift (pick up a cube), square (fit a square nut onto a peg: an insertion task).
+    python scripts/make_config.py <algo> [lift|square] [num_epochs]
 """
 import json
 import os
@@ -14,7 +10,7 @@ import sys
 import robomimic
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-EPOCHS = {"lift": 600, "square": 1000}  # square is longer and harder -> train longer
+EPOCHS = {"lift": 600, "square": 1000}
 
 
 def dataset_path(task):
@@ -29,7 +25,7 @@ def main(algo, task="lift", epochs=None):
 
     c["experiment"]["name"] = name
     c["experiment"]["logging"]["log_wandb"] = False
-    # we evaluate ourselves (sync vs async), so skip robomimic's rollouts during training
+    # Disable robomimic's rollouts during training.
     c["experiment"]["rollout"]["enabled"] = False
     c["experiment"]["save"]["enabled"] = True
     c["experiment"]["save"]["every_n_epochs"] = 100
@@ -41,8 +37,8 @@ def main(algo, task="lift", epochs=None):
 
     if algo == "diffusion_policy":
         h = c["algo"]["horizon"]
-        c["train"]["frame_stack"] = h["observation_horizon"]  # 2
-        c["train"]["seq_length"] = h["prediction_horizon"]    # 16
+        c["train"]["frame_stack"] = h["observation_horizon"]
+        c["train"]["seq_length"] = h["prediction_horizon"]
 
     os.makedirs(os.path.join(ROOT, "configs"), exist_ok=True)
     out = os.path.join(ROOT, "configs", f"{name}.json")

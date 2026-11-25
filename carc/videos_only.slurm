@@ -1,5 +1,5 @@
 #!/bin/bash
-# Re-render the comparison videos only (no evaluation rollouts).
+# Render the comparison videos only.
 #   BC_CKPT=... DP_CKPT=... [OUT=... HORIZON=...] sbatch -A <account> carc/videos_only.slurm
 #SBATCH --job-name=asyncsim-videos
 #SBATCH --partition=gpu

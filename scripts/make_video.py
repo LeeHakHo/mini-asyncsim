@@ -1,12 +1,7 @@
 """
-Record sync / async_repeat / async_stop rollouts of the same policy from the
-SAME initial state, then render each to mp4 (plus a side-by-side comparison).
-
-Async episodes run with physics in a separate process (asyncsim.AsyncEnv).
-Only sim states are recorded during the rollouts. Rendering happens afterwards
-in a fresh process that builds its own offscreen env and replays the states:
-offscreen rendering in the process that ran the async rollouts returned
-corrupted frames.
+Record sync, async_repeat and async_stop rollouts from the same initial state and
+render them to mp4, plus a side-by-side video. Rendering replays the recorded
+states in a separate process.
 
     python scripts/make_video.py --ckpt runs/bc/.../last.pth --extra_latency 0.2 --out videos_new/bc_lat200
 """
@@ -35,7 +30,7 @@ def write(path, frames, fps):
 
 
 def render_worker(ckpt, recorded, out, size, camera, control_freq):
-    """Runs in a fresh process: build an offscreen env, replay states, write mp4s."""
+    """Replay recorded states in an offscreen env and write mp4s."""
     from PIL import Image, ImageDraw
     from asyncsim.envs import env_from_ckpt
 
@@ -53,7 +48,7 @@ def render_worker(ckpt, recorded, out, size, camera, control_freq):
             frames.append(np.array(im))
         results[mode] = frames
 
-    fps = int(control_freq)  # one frame per control tick -> plays in real (sim) time
+    fps = int(control_freq)
     for mode in MODES:
         write(f"{out}_{mode}.mp4", results[mode], fps)
     n = max(len(results[m]) for m in MODES)

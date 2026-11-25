@@ -1,11 +1,7 @@
 """
-Evaluate one configuration (policy, mode, latency, ...) and append results to a CSV.
+Evaluate one configuration and append the results to a CSV.
 
-Examples:
-    # smoke test without a trained policy (random actions)
     python scripts/eval.py --dummy --dataset datasets/lift/ph/low_dim_v15.hdf5 --mode async -n 2
-
-    # trained policy, async (physics in a separate process), +50 ms artificial latency
     python scripts/eval.py --ckpt runs/bc/.../last.pth --mode async --hold stop --extra_latency 0.05 -n 50
 """
 import argparse
@@ -44,14 +40,13 @@ class RandomPolicy:
 
 
 def policy_frame_stack(env, config):
-    """robomimic's env_from_checkpoint already wraps the env in a FrameStackWrapper
-    when frame_stack > 1; only stack ourselves if it did not."""
+    """Return the frame stack to apply, or 1 if the env already stacks frames."""
     from robomimic.envs.wrappers import FrameStackWrapper
     return 1 if isinstance(env, FrameStackWrapper) else config.train.frame_stack
 
 
 def load(ckpt=None, dataset=None, device="cuda", render_offscreen=False):
-    """Returns (policy, local env, env_fn for the physics process, frame_stack, algo name)."""
+    """Return (policy, env, env_fn, frame_stack, algo name)."""
     if ckpt is None:
         env_fn = functools.partial(envs.env_from_dataset, dataset)
         env = envs.env_from_dataset(dataset, render_offscreen=render_offscreen)
@@ -67,7 +62,7 @@ def load(ckpt=None, dataset=None, device="cuda", render_offscreen=False):
 
 
 def make_async_env(env, env_fn, control_freq, real_time_rate, horizon):
-    """Start the physics process for `env` (shared-memory layout from a sample obs)."""
+    """Start the physics process for env."""
     spec = envs.obs_spec(env.reset())
     return AsyncEnv(env_fn, spec, env.action_dimension, control_freq=control_freq,
                     real_time_rate=real_time_rate, horizon=horizon)
@@ -101,7 +96,7 @@ def main():
     aenv = None
     if args.mode == "async":
         aenv = make_async_env(env, env_fn, args.control_freq, args.real_time_rate, args.horizon)
-        np.random.seed(args.seed)  # same initial states as a sync run with this seed
+        np.random.seed(args.seed)  # Same initial states as sync.
 
     rows = []
     try:
@@ -124,7 +119,6 @@ def main():
           f"success {np.mean([r['success'] for r in rows]):.2%} over {len(rows)} rollouts")
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    # fixed column set so sync and async rows can share one CSV
     new = not os.path.exists(args.out)
     with open(args.out, "a", newline="") as f:
         w = csv.DictWriter(f, fieldnames=FIELDS, restval="")

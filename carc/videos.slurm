@@ -1,6 +1,5 @@
 #!/bin/bash
-# Render sync / async_repeat / async_stop videos for BC and Diffusion Policy
-# (async = physics in a separate process), plus a success-rate check for BC at +200 ms.
+# Render comparison videos for BC and Diffusion Policy and evaluate BC at +200 ms.
 #   BC_CKPT=... DP_CKPT=... OUT=videos_new sbatch -A <account> carc/videos.slurm
 #SBATCH --job-name=asyncsim-videos
 #SBATCH --partition=gpu
@@ -17,16 +16,16 @@ cd "$SLURM_SUBMIT_DIR"
 export MUJOCO_GL=egl
 OUT=${OUT:-videos_new}
 
-# 0. two-process smoke test with a random policy
+# Smoke test with a random policy.
 python scripts/eval.py --dummy --dataset datasets/lift/ph/low_dim_v15.hdf5 --mode async -n 2 \
     --horizon 60 --extra_latency 0.05 --out results/smoke_mp.csv
 
-# 1. videos
+# Videos.
 python scripts/make_video.py --ckpt "$BC_CKPT" --extra_latency 0.2 --out "$OUT/bc_lat200"
 python scripts/make_video.py --ckpt "$DP_CKPT" --extra_latency 0.0 --out "$OUT/dp_lat0"
 python scripts/make_video.py --ckpt "$DP_CKPT" --extra_latency 0.2 --out "$OUT/dp_lat200"
 
-# 2. BC +200 ms, 20 rollouts per mode (compare with the old thread-based numbers)
+# BC at +200 ms, 20 rollouts per mode.
 CSV=results/bc_lat200_modes_mp.csv
 python scripts/eval.py --ckpt "$BC_CKPT" --mode sync               --extra_latency 0.2 -n 20 --out $CSV
 python scripts/eval.py --ckpt "$BC_CKPT" --mode async --hold repeat --extra_latency 0.2 -n 20 --out $CSV

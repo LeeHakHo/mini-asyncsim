@@ -1,6 +1,5 @@
 """
-Compare tasks: success rate vs. extra policy latency, one row per task,
-one column per policy, one line per mode. Reads the summary.csv files written by plot.py.
+Plot success rate vs. extra latency for several tasks from plot.py summaries.
 
     python scripts/compare.py docs/compare.png Lift=docs/summary.csv Square=docs/square/summary.csv
 """
@@ -12,7 +11,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from plot import ALGOS, GRID, INK, MODES, MUTED  # same colours / order as the per-task figure
+from plot import ALGOS, GRID, INK, MODES, MUTED
 
 
 def read(path):

@@ -1,26 +1,25 @@
 """
-Defines the evaluation grid and prints the eval.py arguments for one index.
-Used by carc/sweep.slurm: each Slurm array task evaluates one grid cell.
+Evaluation grid. Prints the number of cells or the eval.py arguments for one cell.
 
-    python scripts/sweep_grid.py --count        # number of cells
-    python scripts/sweep_grid.py --index 7      # args for cell 7
+    python scripts/sweep_grid.py --count
+    python scripts/sweep_grid.py --index 7
 """
 import argparse
 import itertools
 import os
 
-CKPTS = {  # name -> checkpoint path (set via env vars so the grid stays generic)
+CKPTS = {  # Checkpoint paths from env vars.
     "bc": os.environ.get("BC_CKPT", ""),
     "diffusion_policy": os.environ.get("DP_CKPT", ""),
 }
-MODES = {  # name -> eval.py args
+MODES = {
     "sync": "--mode sync",
     "async_repeat": "--mode async --hold repeat",
     "async_stop": "--mode async --hold stop",
 }
-LATENCIES = [0.0, 0.1, 0.2, 0.4, 0.8]  # extra seconds per policy call
+LATENCIES = [0.0, 0.1, 0.2, 0.4, 0.8]  # Extra seconds per policy call.
 SEED = 0
-HORIZON = int(os.environ.get("HORIZON", 400))  # control ticks per episode
+HORIZON = int(os.environ.get("HORIZON", 400))  # Control ticks per episode.
 
 
 def grid():

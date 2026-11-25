@@ -1,5 +1,5 @@
 #!/bin/bash
-# Train a robomimic policy (low-dim) on one GPU. TASK: lift (default) or square.
+# Train a low-dim robomimic policy. TASK: lift (default) or square.
 #   sbatch -A <account> carc/train.slurm bc
 #   sbatch -A <account> carc/train.slurm diffusion_policy square [num_epochs]
 #SBATCH --job-name=asyncsim-train

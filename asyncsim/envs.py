@@ -1,12 +1,9 @@
-"""
-Env builders. They are top-level functions so they can be pickled and called
-inside the physics process (AsyncEnv uses the "spawn" start method).
-"""
+"""Env builders. Top-level functions so they can be pickled for the physics process."""
 LOW_DIM_KEYS = ["robot0_eef_pos", "robot0_eef_quat", "robot0_gripper_qpos", "object"]
 
 
 def env_from_ckpt(ckpt_path, render_offscreen=False):
-    """Same env (incl. frame stacking wrapper) that the policy was trained for."""
+    """Build the env stored in a checkpoint, including frame stacking."""
     import robomimic.utils.file_utils as FileUtils
     import robomimic.utils.obs_utils as ObsUtils
 
@@ -19,7 +16,7 @@ def env_from_ckpt(ckpt_path, render_offscreen=False):
 
 
 def env_from_dataset(dataset_path, render_offscreen=False):
-    """Lift env from a robomimic dataset (used with a random policy for smoke tests)."""
+    """Build the env from a robomimic dataset."""
     import robomimic.utils.env_utils as EnvUtils
     import robomimic.utils.file_utils as FileUtils
     import robomimic.utils.obs_utils as ObsUtils
@@ -32,6 +29,6 @@ def env_from_dataset(dataset_path, render_offscreen=False):
 
 
 def obs_spec(obs):
-    """{key: shape} of an observation dict, for AsyncEnv's shared-memory layout."""
+    """Return {key: shape} of an observation dict."""
     import numpy as np
     return {k: tuple(np.asarray(v).shape) for k, v in obs.items()}

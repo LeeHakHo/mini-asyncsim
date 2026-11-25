@@ -1,9 +1,7 @@
 """
-Synchronous vs asynchronous rollouts for a robomimic RolloutPolicy.
+Sync and async rollouts for a robomimic RolloutPolicy.
 
-Both modes use the same policy and the same artificial extra latency
-(`extra_latency`, seconds added to every policy call). In sync mode latency
-only costs wall-clock time; in async mode the world keeps moving meanwhile.
+extra_latency adds a fixed delay (seconds) to every policy call.
 """
 import time
 from collections import deque
@@ -11,10 +9,8 @@ from collections import deque
 import numpy as np
 
 
-
 class FrameStacker:
-    """Keeps the last `n` observations and stacks them along a new axis 0
-    (robomimic policies trained with frame_stack > 1 expect [n, ...])."""
+    """Stack the last n observations along a new first axis."""
 
     def __init__(self, n):
         self.n = n
@@ -75,15 +71,12 @@ def sync_rollout(policy, env, horizon, frame_stack=1, extra_latency=0.0,
 
 def async_rollout(policy, aenv, env, frame_stack=1, extra_latency=0.0, hold="repeat",
                   record=False, init_state=None):
-    """Policy runs in this process as fast as it can; physics runs in the
-    AsyncEnv's separate process at a fixed wall-clock rate.
+    """Run the policy in this process while physics runs in the AsyncEnv process.
 
     Args:
-        aenv: AsyncEnv (physics process), reused across episodes
-        env: local env, only used to sample the initial state so that sync and
-             async episodes start from the same distribution
-        hold: what the robot does while waiting for the next action
-              ("repeat" last action or "stop")
+        aenv: AsyncEnv
+        env: local env, used to sample the initial state
+        hold: "repeat" or "stop" (see AsyncEnv.start)
     """
     policy.start_episode()
     stack = FrameStacker(frame_stack)
@@ -100,13 +93,13 @@ def async_rollout(policy, aenv, env, frame_stack=1, extra_latency=0.0, hold="rep
         while not aenv.done():
             obs, obs_step = aenv.latest_obs()
             if obs_step == last_obs_step:
-                # no new observation yet -> don't recompute on the same frame
+                # Wait for a new observation.
                 time.sleep(aenv.wall_dt / 10)
                 continue
             last_obs_step = obs_step
             action, lat = _act(policy, stack(obs), extra_latency)
             latencies.append(lat)
-            # how many physics ticks passed between observing and acting
+            # Physics ticks between observation and action.
             staleness.append(aenv.step_count - obs_step)
             aenv.push_action(action)
     finally:
